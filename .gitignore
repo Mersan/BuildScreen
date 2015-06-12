@@ -121,3 +121,7 @@ create_synonym.rb
 /BuildScreen/Web.config
 *.[Dd]ebug.config
 *.[Rr]elease.config
+
+# BuildScreen specific
+/BuildScreen/Content/Images/users/*.*
+/BuildScreen/Content/Images/logo/*.*
