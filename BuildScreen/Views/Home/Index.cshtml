@@ -1,0 +1,210 @@
+﻿@using System.ServiceModel.Security
+@using BuildScreen.Configuration
+@using BuildScreen.Dto.Octopus
+@using BuildScreen.Helpers
+@model BuildScreen.ViewModels.BuildStatusViewModel
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/png" href="~/favicon.png">
+    <link href="/Content/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/Content/css/styles.css" rel="stylesheet">
+    <meta http-equiv="refresh" content="30">
+    <title>Buildmonitor</title>
+</head>
+<body>
+    <div class="container col-md-12">
+        <div class="navbar-header">
+            <img src="~/Content/Images/logo/@(Config.BuildScreenLogo)" alt="logo"/>
+        </div>
+    </div>
+    @if (Model.ErrorMessage!= null && Model.ErrorMessage.Any())
+    {
+        <div class="alert alert-danger" role="alert">
+            @foreach (var message in Model.ErrorMessage)
+            {
+                <p>
+                    <span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>
+                    <span class="sr-only">Error:</span>
+                    @(message)
+                </p>
+            }
+        </div>
+    }
+    
+    @if (Model.Serverinfo != null)
+    {
+        foreach (var build in Model.Builds.OrderByDescending(x => x.Status != "SUCCESS").ThenByDescending(x => x.Running_info != null))
+         {
+             var buildStatus = "-danger";
+             var buildStatusImage = "/Content/Images/Fail.png";
+             if (build.Status == "SUCCESS")
+             {
+                 buildStatus = "-success";
+                 buildStatusImage = "/Content/Images/Success.png";
+             }
+             if (build.Running_info != null && build.Running_info.CurrentStageText.ToLower() == "building")
+             {
+
+                 buildStatus = "-warning";
+                 buildStatusImage = "/Content/Images/Building.gif";
+             }
+             var buildName = (build.BuildConfig != null && !string.IsNullOrWhiteSpace(build.BuildConfig.Name) ? build.BuildConfig.Name : build.BuildTypeId.Replace("_", " "));
+
+             <div class="container col-md-12 alert alert@(buildStatus)">
+
+                 <div class="col-md-7">
+                     <div>
+                         <h1><img src="@(buildStatusImage)" alt="@(build.Status)" /><b>@(buildName)</b></h1>
+                         @if (build.Changes != null && build.Changes.Change != null)
+                         {
+                             var username = build.Changes.Change.FirstOrDefault().Username;
+                             if (build.Status.Contains("ERROR"))
+                             {
+                                 <div>
+                                     <div class="col-md-2" style="padding: 25px;">
+                                         @* ToDo: Get user images from gavatar *@
+                                         <img class="img-thumbnail" src="/Content/Images/users/@(username).png" alt="@(username)" style="padding: 5px;" />
+                                         <p>@(username) </p>
+                                     </div>
+                                     <div class="col-md-10">
+                                         <h1>@(username) is to blame</h1>
+                                         <h3>BuildNumber <b># @(build.Number)</b> (Time: @(build.Changes.Change.FirstOrDefault().Date.ToString("G")))</h3>
+                                     </div>
+                                 </div>
+                             }
+                             else
+                             {
+                                 <div>
+                                     <div class="col-md-2" style="padding: 25px;">
+                                         <img class="img-thumbnail" src="/Content/Images/users/@(username).png" alt="@(username)" style="padding: 5px;" />
+                                         <p>@(username) </p>
+                                     </div>
+                                     <div class="col-md-10">
+                                         <h2>BuildNumber <b># @(build.Number)</b><br />
+                                             Last commit: @(build.Changes.Change.FirstOrDefault().Date.ToString("G"))</h2>
+                                     </div>
+                                 </div>
+                             }
+                         }
+                         else
+                         {
+                             <h2>Last commit: No commits made yet</h2>
+                         }
+                     </div>
+                 </div>
+                 @if (build.BuildConfig != null && build.BuildConfig.Description != null)
+                 {
+                     <div class="col-md-5 panel panel-default">
+                         @{
+                             var buildurl = BuildInfoHelper.GetUrlFromDescription(build.BuildConfig.Description);
+                             if (buildurl != null)
+                             {
+                                 <div class="clearfix panel-heading">
+                                     <h3 class="panel-title">@(buildurl)</h3>
+                                 </div>
+                                 <div class="panel-body">
+                                     @*<p>@(WebHelper.GetVersionInfo(buildurl))</p>*@
+                                     <div class="iframe">
+                                         <iframe class="iframe-content" src="@(buildurl)"></iframe>
+                                     </div>
+                                 </div>
+                             }
+                             else
+                             {
+                                 <div class="panel-heading">
+                                     <h3 class="panel-title">@(buildurl)</h3>
+                                 </div>
+                                 <div class="panel-body">
+                                     <p>Web page not available, set url:http://[your webpage url] in the description of the build</p>
+                                 </div>
+                             }
+                         }
+                     </div>
+                 }
+             </div>
+         }
+    }
+    @if (Model.OctopusDashboard != null)
+    {
+        foreach (var projectGroup in Model.OctopusDashboard.ProjectGroups)
+        {
+            foreach (var project in Model.OctopusDashboard.Projects.Where(p => p.ProjectGroupId == projectGroup.Id))
+            {
+
+                <div class="container col-md-12">
+                    <h2>Deployed versions for @(projectGroup.Name) - @(project.Name)</h2>
+                    @foreach (var item in Model.OctopusDashboard.Items.Where(i=>i.ProjectId == project.Id))
+                    {
+                        var buildStatus = " btn-warning";
+                        var buildStatusImage = "/Content/Images/Edward.png";
+                        if (item.State.ToLower() == "success")
+                        {
+                            buildStatus = " btn-success";
+                        }
+                        else if (item.State.ToLower() == "executing")
+                        {
+
+                            buildStatus = " btn-warning";
+                        }
+                        else
+                        {
+                            buildStatus = " btn-danger";
+                        }
+                        
+                        <div class="col-md-3 panel panel-default">
+                            <h2>@(OctopusHelper.GetEnvironmentName(item, Model.OctopusDashboard.Environments))</h2>
+                            <p>
+                                
+                                <button class=" btn@(buildStatus)">@(item.ReleaseVersion)</button><br />
+                                @if (item.CompletedTime != null)
+                                {
+                                    <span>Deployed: @(DateTime.Parse(item.CompletedTime).ToString("yyyy-MM-dd HH:mm:ss"))</span><br />
+                                }
+                                else if (item.Created != null)
+                                {
+                                    <span>Deployment started: @(DateTime.Parse(item.Created).ToString("yyyy-MM-dd HH:mm:ss"))</span><br />
+                                }
+                                Duration: @(item.Duration)
+                                @if (item.HasWarningsOrErrors)
+                                {
+                                    <br />
+                                    @(item.ErrorMessage)
+                                }
+                            </p>
+                        </div>
+                    }
+                </div>
+            }
+            
+        }
+    }
+    @if (Model.Dashboards != null && Model.Dashboards.Any())
+    {
+        var col = Math.Round(12/(double) Model.Dashboards.Count());
+        foreach (var dashboard in Model.Dashboards)
+        {
+            <div class="col-md-@(col) panel panel-default">
+                <div class="clearfix panel-heading">
+                    <h3 class="panel-title">Dashboard @(dashboard.Key)</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="iframe">
+                        <iframe src="@(dashboard.Value)"></iframe>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    <script src="~/Content/js/jquery-2.1.1.min.js"></script>
+    <script src="~/Content/js/lodash.min.js"></script>
+    <script src="~/Content/js/buildscreen.js"></script>
+</body>
+</html>
